@@ -43,12 +43,14 @@ function showRSVP() {
 let musicStarted = false;
 
 function playMusicOnScroll() {
-    if (!musicStarted) {
-        const music = document.getElementById("bgMusic");
-        let vol = 0;
-        music.volume = vol;
-        music.play();
+    if (musicStarted) return;
 
+    const music = document.getElementById("bgMusic");
+    let vol = 0;
+
+    music.volume = vol;
+
+    music.play().then(() => {
         const fade = setInterval(() => {
             if (vol < 0.4) {
                 vol += 0.02;
@@ -57,15 +59,19 @@ function playMusicOnScroll() {
                 clearInterval(fade);
             }
         }, 150);
+    }).catch(() => {
+        // play blocked – do nothing, wait for another interaction
+        return;
+    });
 
-        musicStarted = true;
-        window.removeEventListener("scroll", playMusicOnScroll);
-        window.removeEventListener("click", playMusicOnScroll);
-        window.removeEventListener("touchstart", playMusicOnScroll);
-    }
+    musicStarted = true;
+
+    window.removeEventListener("scroll", playMusicOnScroll);
+    window.removeEventListener("click", playMusicOnScroll);
+    window.removeEventListener("touchstart", playMusicOnScroll);
 }
+
 window.addEventListener("scroll", playMusicOnScroll);
 window.addEventListener("click", playMusicOnScroll);
-
-// Mobile (MOST IMPORTANT)
 window.addEventListener("touchstart", playMusicOnScroll);
+
