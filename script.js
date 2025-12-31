@@ -60,7 +60,12 @@ function playMusicOnScroll() {
 
         musicStarted = true;
         window.removeEventListener("scroll", playMusicOnScroll);
+        window.removeEventListener("click", playMusicOnScroll);
+        window.removeEventListener("touchstart", playMusicOnScroll);
     }
 }
-
 window.addEventListener("scroll", playMusicOnScroll);
+window.addEventListener("click", playMusicOnScroll);
+
+// Mobile (MOST IMPORTANT)
+window.addEventListener("touchstart", playMusicOnScroll);
