@@ -1,0 +1,232 @@
+body {
+    font-family: 'Playfair Display', serif;
+    background: radial-gradient(circle at top, #fff4e6, #fbe7c6),
+        url("./lordbalagi.jpg") center/cover;
+    overflow-x: hidden;
+}
+
+/* Hero */
+.hero {
+    height: 100vh;
+    background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+        url("./back.jpg") center/cover;
+    color: white;
+}
+
+.overlay {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.blessing {
+    font-size: 22px;
+}
+
+.couple-names {
+    font-family: 'Great Vibes', cursive;
+    font-size: 80px;
+    color: gold;
+    text-shadow: 2px 2px 15px rgba(0,0,0,0.5);
+}
+
+.subtitle {
+    font-size: 20px;
+}
+
+.date {
+    font-size: 18px;
+}
+
+.invite-text {
+    font-size: 20px;
+    line-height: 1.8;
+}
+
+.section-title {
+    color: maroon;
+    font-weight: bold;
+}
+
+.footer {
+    background: maroon;
+    color: white;
+    padding: 40px 10px;
+}
+
+/* Music button */
+.music-btn {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    z-index: 1000;
+    background: gold;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+/* Decor GIFs */
+.decor-gif {
+    width: 120px;
+    margin: 20px auto;
+    display: block;
+}
+
+.bottom-gif {
+    margin-bottom: 40px;
+}
+
+/* RSVP button animation */
+.btn-warning {
+    box-shadow: 0 0 20px rgba(255,193,7,0.8);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 10px gold; }
+    50% { box-shadow: 0 0 25px gold; }
+    100% { box-shadow: 0 0 10px gold; }
+}
+
+/* Animations */
+.fade-in {
+    animation: fadeIn 2s ease-in-out;
+}
+
+.slide-up {
+    animation: slideUp 1.5s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.petals-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+    overflow: hidden;
+}
+
+.petal {
+    position: absolute;
+
+    width: var(--size);
+    height: var(--size);
+
+    background-image: var(--img);
+    background-size: contain;
+    background-repeat: no-repeat;
+
+    opacity: var(--opacity);
+    animation: fall var(--duration) linear infinite;
+    animation-timing-function: linear;
+
+
+    pointer-events: none;
+}
+
+
+
+@keyframes fall {
+    from {
+        transform: translate(-20px, -10vh) rotate(0deg);
+    }
+    to {
+        transform: translate(20px, 110vh) rotate(360deg);
+    }
+}
+
+
+/* frame */
+
+/* Outer wrapper */
+.invite-wrapper {
+    padding: 5vw;
+    background: #fdf3e7;
+}
+
+/* Card */
+.invite-card {
+    position: relative;
+    max-width: 900px;
+    margin: auto;
+    padding: clamp(20px, 5vw, 60px);
+    background: linear-gradient(#fff8dc, #fdf3e7);
+    border: clamp(3px, 0.6vw, 6px) solid gold;
+    box-shadow: 0 0 5vw rgba(218,165,32,0.4);
+}
+
+/* Decorative corners */
+.corner {
+    position: absolute;
+    width: clamp(25px, 6vw, 50px);
+    height: clamp(25px, 6vw, 50px);
+    border: clamp(3px, 0.6vw, 6px) solid maroon;
+}
+
+.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+
+/* Content */
+.invite-content {
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+}
+
+.invite-content h4 {
+    font-size: clamp(14px, 3vw, 22px);
+    color: maroon;
+}
+
+.invite-content h1 {
+    font-family: 'Great Vibes', cursive;
+    font-size: clamp(32px, 8vw, 80px);
+    color: gold;
+    margin: 10px 0;
+}
+
+.invite-content p {
+    font-size: clamp(14px, 3.5vw, 20px);
+    line-height: 1.6;
+}
+
+.corner::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: clamp(24px, 8vw, 28px);
+    height: clamp(24px, 8vw, 28px); 
+    background-image: url("./edges2.png"); /* or diya.svg */
+    background-size: contain;
+    background-repeat: no-repeat;
+    transform: translate(-50%, -50%);
+}
+
+.invite-card {
+    animation: fadeInUp 1.5s ease;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* frame end */
