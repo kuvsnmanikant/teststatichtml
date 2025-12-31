@@ -40,3 +40,27 @@ function showRSVP() {
     alert("Please RSVP by calling: +91 98765 43210");
 }
 
+let musicStarted = false;
+
+function playMusicOnScroll() {
+    if (!musicStarted) {
+        const music = document.getElementById("bgMusic");
+        let vol = 0;
+        music.volume = vol;
+        music.play();
+
+        const fade = setInterval(() => {
+            if (vol < 0.4) {
+                vol += 0.02;
+                music.volume = vol;
+            } else {
+                clearInterval(fade);
+            }
+        }, 150);
+
+        musicStarted = true;
+        window.removeEventListener("scroll", playMusicOnScroll);
+    }
+}
+
+window.addEventListener("scroll", playMusicOnScroll);
