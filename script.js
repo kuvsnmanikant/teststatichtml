@@ -27,7 +27,7 @@ function createPetal() {
 
 setInterval(createPetal, 300);
 
-
+ 
 // Music play
 function playMusic() {
     const music = document.getElementById("bgMusic");
@@ -41,6 +41,53 @@ function showRSVP() {
 }
 
 let musicStarted = false;
+
+
+
+
+
+
+
+
+
+document.getElementById("playBtn").addEventListener("click", () => {
+    if (musicStarted) return;
+
+    const music = document.getElementById("bgMusic");
+    let vol = 0;
+    music.volume = vol;
+
+    music.play()
+        .then(() => {
+            const fade = setInterval(() => {
+                if (vol < 0.4) {
+                    vol += 0.02;
+                    music.volume = vol;
+                } else {
+                    clearInterval(fade);
+                }
+            }, 150);
+        })
+        .catch(err => {
+            console.error("Audio play failed:", err);
+        });
+
+    musicStarted = true;
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function playMusicOnScroll() {
     if (musicStarted) return;
