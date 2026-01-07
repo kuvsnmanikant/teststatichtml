@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saree Color Picker & Designer Combinations</title>
+
+<style>
+body{margin:14px;background:#fafafa;font-family:system-ui}
+h2{margin-bottom:6px}
+.section{margin-top:18px}
+.section h3{margin:6px 0;font-size:14px}
+.section p{font-size:12px;color:#555;margin:4px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.box{
+  height:60px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;cursor:pointer
+}
+canvas{max-width:100%;border:1px solid #ccc;border-radius:8px;cursor:crosshair}
+.color-box{width:90px;height:50px;border-radius:6px;border:1px solid #ccc}
+.info{display:flex;gap:10px;align-items:center;margin-top:8px}
+.toast{position:fixed;bottom:20px;right:20px;background:#000;color:#fff;padding:8px 12px;border-radius:6px;opacity:0;transition:.3s}
+.toast.show{opacity:1}
+</style>
+</head>
+
+<body>
+
+<h2>Saree Color Picker & Matching Assistant</h2>
+<input type="file" id="upload" accept="image/*">
+<canvas id="canvas"></canvas>
+
+<div class="info">
+  <div class="color-box" id="preview"></div>
+  <div>
+    <div id="hex">HEX: —</div>
+    <div id="rgb">RGB: —</div>
+  </div>
+</div>
+
+<div id="result"></div>
+<div class="toast" id="toast">Copied</div>
+
+<script>
+/* ---------- DESCRIPTIONS ---------- */
+const DESCRIPTIONS={
+  "Base Color":"Main saree body color.",
+  "Shades (Darker)":"Use for borders and heavy areas.",
+  "Tints (Lighter)":"Use for pallu, dupatta, or day wear.",
+  "Tones (Muted)":"Elegant and modern appearance.",
+  "Analogous Colors":"Safe matching nearby colors.",
+  "Complement Variations":"High contrast festive options.",
+  "Blouse Color Suggestions":"Recommended blouse colors – safe + contrast.",
+  "Festive & Neutral Accents":"Zari, embroidery, outlines."
+};
+
+/* ---------- UTILITIES ---------- */
+const hexToRgb=h=>h.replace("#","").match(/.{2}/g).map(v=>parseInt(v,16));
+const rgbToHex=(r,g,b)=>"#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("").toUpperCase();
+
+function rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);
+  let h=0,s=0,l=(max+min)/2;
+  if(max!==min){
+    const d=max-min;
+    s=l>0.5?d/(2-max-min):d/(max+min);
+    switch(max){
+      case r:h=(g-b)/d+(g<b?6:0);break;
+      case g:h=(b-r)/d+2;break;
+      case b:h=(r-g)/d+4;break;
+    }
+    h*=60;
+  }
+  return {h,s:s*100,l:l*100};
+}
+
+function hslToHex(h,s,l){
+  s/=100;l/=100;
+  const c=(1-Math.abs(2*l-1))*s;
+  const x=c*(1-Math.abs((h/60)%2-1));
+  const m=l-c/2;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x}
+  else if(h<120){r=x;g=c}
+  else if(h<180){g=c;b=x}
+  else if(h<240){g=x;b=c}
+  else if(h<300){r=x;b=c}
+  else{r=c;b=x}
+  return rgbToHex(
+    Math.round((r+m)*255),
+    Math.round((g+m)*255),
+    Math.round((b+m)*255)
+  );
+}
+
+function textColor(hex){
+  const [r,g,b]=hexToRgb(hex);
+  return (0.2126*r+0.7152*g+0.0722*b)/255>0.6?"#000":"#FFF";
+}
+
+function box(hex){
+  return `<div class="box" style="background:${hex};color:${textColor(hex)}"
+    onclick="copy('${hex}')">${hex}</div>`;
+}
+
+/* ---------- COMBINATION ENGINE ---------- */
+function generateCombinations(hex){
+  const {h,s,l}=rgbToHsl(...hexToRgb(hex));
+
+  return [
+    {title:"Base Color", colors:[hex]},
+    {title:"Shades (Darker)", colors:[20,25,30,35,40,45].map(x=>hslToHex(h,s,x))},
+    {title:"Tints (Lighter)", colors:[65,70,75,80,85,90].map(x=>hslToHex(h,s,x))},
+    {title:"Tones (Muted)", colors:[20,25,30,35,40,45].map(x=>hslToHex(h,x,l))},
+    {title:"Analogous Colors", colors:[-45,-30,-15,15,30,45].map(x=>hslToHex((h+x+360)%360,s,l))},
+    {title:"Complement Variations", colors:[30,40,50,60,70,80].map(x=>hslToHex((h+180)%360,s,x))},
+    {
+      title:"Blouse Color Suggestions",
+      colors:[
+        hslToHex(h,s,30),
+        hslToHex(h,s,40),
+        hslToHex(h,s,50),
+        "#800020",   // Maroon
+        "#0B3D2E",   // Bottle green
+        "#0A2540"    // Navy
+      ]
+    },
+    {
+      title:"Festive & Neutral Accents",
+      colors:["#FFD700","#CFAE70","#800020","#0A2540","#F6F1EB","#000000"]
+    }
+  ];
+}
+
+/* ---------- IMAGE PICKER ---------- */
+const upload=document.getElementById("upload");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+const preview=document.getElementById("preview");
+const hexOut=document.getElementById("hex");
+const rgbOut=document.getElementById("rgb");
+
+upload.onchange=e=>{
+  const img=new Image();
+  img.onload=()=>{
+    const scale=Math.min(1,800/img.width);
+    canvas.width=img.width*scale;
+    canvas.height=img.height*scale;
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  };
+  img.src=URL.createObjectURL(e.target.files[0]);
+};
+
+canvas.onclick=e=>{
+  const rect=canvas.getBoundingClientRect();
+  const x=Math.floor((e.clientX-rect.left)*(canvas.width/rect.width));
+  const y=Math.floor((e.clientY-rect.top)*(canvas.height/rect.height));
+  const [r,g,b]=ctx.getImageData(x,y,1,1).data;
+  const hex=rgbToHex(r,g,b);
+  preview.style.background=hex;
+  hexOut.textContent="HEX: "+hex;
+  rgbOut.textContent=`RGB: ${r}, ${g}, ${b}`;
+  show(hex);
+};
+
+/* ---------- RENDER ---------- */
+function show(hex){
+  const result=document.getElementById("result");
+  const sections=generateCombinations(hex);
+  let html="";
+  sections.forEach(s=>{
+    html+=`
+      <div class="section">
+        <h3>${s.title}</h3>
+        <p>${DESCRIPTIONS[s.title]}</p>
+        <div class="grid">
+          ${s.colors.map(c=>box(c)).join("")}
+        </div>
+      </div>`;
+  });
+  result.innerHTML=html;
+}
+
+/* ---------- COPY ---------- */
+function copy(val){
+  navigator.clipboard.writeText(val);
+  const t=document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),800);
+}
+</script>
+
+</body>
+</html>
