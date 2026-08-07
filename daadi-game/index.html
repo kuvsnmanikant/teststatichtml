@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <title>Daadi - Two Player</title>
+    <link rel="stylesheet" href="styles.css?v=2" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel">
+        <h1>Daadi</h1>
+        <p class="subtitle">Two-player offline board game</p>
+
+        <div id="status" class="status">Player 1 to place a stone.</div>
+
+        <div class="stats">
+          <div class="stat-card red">
+            <span>Player 1</span>
+            <strong id="p1-count">9</strong>
+          </div>
+          <div class="stat-card blue">
+            <span>Player 2</span>
+            <strong id="p2-count">9</strong>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="undoBtn" disabled>Undo</button>
+          <button id="newGameBtn">New Game</button>
+        </div>
+
+        <div class="instructions">
+          <h2>How to play</h2>
+          <ul>
+            <li>Place 9 stones per player.</li>
+            <li>After all stones are placed, move them.</li>
+            <li>When you have 3 stones left, you can fly to any empty point.</li>
+            <li>Form a mill to remove one opponent stone.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="board-wrap">
+        <div id="board" class="board" aria-label="Daadi board"></div>
+      </section>
+    </main>
+
+    <script src="script.js?v=2"></script>
+  </body>
+</html>
