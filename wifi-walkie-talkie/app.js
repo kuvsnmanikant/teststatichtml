@@ -4,10 +4,11 @@
 const $ = id => document.getElementById(id);
 const state = {
   role: null, mode: "ptt", peers: new Map(), pendingHostPc: null,
-  pendingJoinPc: null, localStream: null, scannerStream: null,
-  scanTarget: null, scanFrame: null, speakerOn: true, micOn: true,
-  talkActive: false
+  pendingHostPeer: null, pendingJoinPc: null, pendingJoinPeer: null,
+  localStream: null, scannerStream: null, scanTarget: null, scanFrame: null,
+  speakerOn: true, micOn: true, talkActive: false
 };
+const QR_SIZE_LIMIT = 1500;
 
 // No STUN/TURN server is configured: this deliberately targets same-LAN use.
 // Browsers may use mDNS host candidates. Test on the actual devices/network.
@@ -50,11 +51,15 @@ function parseSignal(value, expected) {
 function makeQr(containerId, text) {
   const el=$(containerId); el.innerHTML="";
   if(typeof QRCode==="undefined"){el.textContent="QR library unavailable. Use Copy instead.";return;}
-  if(text.length > 1800){
-    el.textContent="This connection payload is large. Use Copy/Download JSON for best reliability on mobile.";
+  if(text.length > QR_SIZE_LIMIT){
+    el.textContent="This connection payload is too large for a reliable QR scan. Copy or download the JSON instead.";
     return;
   }
   new QRCode(el,{text,width:260,height:260,correctLevel:QRCode.CorrectLevel.H});
+}
+function setConnectionMessage(message, good=false) {
+  $("audioStatus").textContent = message;
+  setStatus(good ? "Connected" : "Ready", good);
 }
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); alert("Copied."); }
@@ -89,20 +94,56 @@ function addPeer(pc,name,role) {
     if(e.track && !peer.remoteStream.getTracks().includes(e.track)) peer.remoteStream.addTrack(e.track);
     attachRemoteAudio(peer);
   };
-  pc.onconnectionstatechange=()=>{ 
-    if(["failed","closed","disconnected"].includes(pc.connectionState)){ 
+  pc.onconnectionstatechange=()=>{
+    if(pc.connectionState==="connected"){
+      setConnectionMessage("Peer connected and ready for audio.",true);
+    } else if(pc.connectionState==="connecting"){
+      setConnectionMessage("Connecting to peer…");
+    } else if(["failed","closed","disconnected"].includes(pc.connectionState)){
+      setConnectionMessage("Peer disconnected. Reconnect to continue.");
       if(pc.connectionState!=="disconnected") removePeer(id);
       renderPeers();
     } else renderPeers();
   };
-  pc.oniceconnectionstatechange=renderPeers;
+  pc.oniceconnectionstatechange=()=>{
+    if(pc.iceConnectionState==="checking") setConnectionMessage("Checking local network connection…");
+    else if(pc.iceConnectionState==="failed") setConnectionMessage("Connection check failed. Reconnect on the same Wi‑Fi.");
+    renderPeers();
+  };
   renderPeers(); updateAudioControls(); return peer;
+}
+function clearPendingHostConnection() {
+  if(state.pendingHostPc){
+    try{state.pendingHostPc.close();}catch{}
+    state.pendingHostPc=null;
+  }
+  state.pendingHostPeer=null;
+}
+function clearPendingJoinConnection() {
+  if(state.pendingJoinPc){
+    try{state.pendingJoinPc.close();}catch{}
+    state.pendingJoinPc=null;
+  }
+  state.pendingJoinPeer=null;
 }
 function removePeer(id) {
   const p=state.peers.get(id); if(!p)return;
   try{p.pc.close();}catch{}
-  if(p.audio){p.audio.pause();p.audio.srcObject=null;}
+  if(p.audio){p.audio.pause();p.audio.srcObject=null;p.audio.load();}
+  p.remoteStream?.getTracks().forEach(track=>{try{track.stop();}catch{}});
   state.peers.delete(id);renderPeers();updateAudioControls();
+}
+function resetConnectionState() {
+  stopTalking();
+  stopScanner();
+  clearPendingHostConnection();
+  clearPendingJoinConnection();
+  for(const id of [...state.peers.keys()]) removePeer(id);
+  state.localStream?.getTracks().forEach(t=>{try{t.stop();}catch{}});
+  state.localStream=null;
+  $("answerText").value="";$("joinOfferText").value="";$("generatedAnswer").value="";
+  $("offerText").value="";$("answerArea").classList.add("hidden");$("offerArea").classList.add("hidden");
+  $("answerState").textContent="";$("offerState").textContent="";
 }
 function renderPeers() {
   const list=$("participants");list.innerHTML="";
@@ -203,22 +244,36 @@ $("micEnabled").onchange=e=>{
 $("speakerEnabled").onchange=e=>{state.speakerOn=e.target.checked;for(const p of state.peers.values())if(p.audio)p.audio.muted=!state.speakerOn;};
 $("muteBtn").onclick=()=>{$("speakerEnabled").checked=!$("speakerEnabled").checked;$("speakerEnabled").dispatchEvent(new Event("change"));$("muteBtn").textContent=state.speakerOn?"Mute speaker":"Unmute speaker";};
 
-$("hostBtn").onclick=()=>{state.role="host";show("hostPanel");hide("joinPanel");setStatus("Host mode");};
-$("joinBtn").onclick=()=>{state.role="join";show("joinPanel");hide("hostPanel");setStatus("Join mode");};
+$("hostBtn").onclick=()=>{
+  resetConnectionState();
+  state.role="host";show("hostPanel");hide("joinPanel");setStatus("Host mode");
+  $("audioStatus").textContent="Create an invitation for each participant on this Wi‑Fi network.";
+};
+$("joinBtn").onclick=()=>{
+  resetConnectionState();
+  state.role="join";show("joinPanel");hide("hostPanel");setStatus("Join mode");
+  $("audioStatus").textContent="Paste or scan the host offer to create your answer.";
+};
 
 $("makeOfferBtn").onclick=async()=>{
   try{
+    clearPendingHostConnection();
     const pc=new RTCPeerConnection(rtcConfig);
-    // Reserve audio transceiver so the remote peer can send audio back.
     pc.addTransceiver("audio",{direction:"sendrecv"});
     const peer=addPeer(pc,"Joining device","host");
     state.pendingHostPc=pc;state.pendingHostPeer=peer;
     const offer=await pc.createOffer();await pc.setLocalDescription(offer);
     $("offerState").textContent="Gathering local network candidates…";
+    setConnectionMessage("Preparing connection offer…");
     await waitIceComplete(pc);
     const text=encodeSignal({type:"offer",sdp:pc.localDescription.sdp,from:deviceName(),version:1});
     $("offerText").value=text;makeQr("offerQr",text);show("offerArea");
-    $("offerState").textContent="Invitation ready. Share it with ONE joining device. Create a separate invitation for each additional device.";
+    if(text.length > QR_SIZE_LIMIT) {
+      $("offerState").textContent="Offer generated. QR is large; copy or download the JSON for the most reliable transfer.";
+    } else {
+      $("offerState").textContent="Invitation ready. Share it with ONE joining device. Create a separate invitation for each additional device.";
+    }
+    setStatus("Offer ready");
   }catch(e){alert(e.message);}
 };
 $("copyOfferBtn").onclick=()=>copyText($("offerText").value);
@@ -231,6 +286,7 @@ $("applyAnswerBtn").onclick=async()=>{
     const answer=parseSignal($("answerText").value,"answer");
     await state.pendingHostPc.setRemoteDescription(answer);
     if(state.pendingHostPeer && answer.from)state.pendingHostPeer.name=answer.from;
+    setConnectionMessage("Answer applied. Waiting for the peer connection to finish connecting…", true);
     state.pendingHostPc=null;state.pendingHostPeer=null;
     $("answerText").value="";
     setStatus("Answer applied");renderPeers();
@@ -239,19 +295,26 @@ $("applyAnswerBtn").onclick=async()=>{
 
 $("createAnswerBtn").onclick=async()=>{
   try{
+    clearPendingJoinConnection();
     const offer=parseSignal($("joinOfferText").value,"offer");
     const pc=new RTCPeerConnection(rtcConfig);
     pc.addTransceiver("audio",{direction:"sendrecv"});
     const peer=addPeer(pc,offer.from||"Host","join");
     state.pendingJoinPc=pc;state.pendingJoinPeer=peer;
     if(pc.remoteDescription) throw new Error("This joining device is already connected. Start a new offer from the host.");
+    $("answerState").textContent="Connecting to host offer…";
+    setConnectionMessage("Creating your answer for the host…");
     await pc.setRemoteDescription(offer);
     const answer=await pc.createAnswer();await pc.setLocalDescription(answer);
     $("answerState").textContent="Gathering local network candidates…";
     await waitIceComplete(pc);
     const text=encodeSignal({type:"answer",sdp:pc.localDescription.sdp,from:deviceName(),version:1});
     $("generatedAnswer").value=text;makeQr("answerQr",text);show("answerArea");
-    $("answerState").textContent="Send this answer back to the host.";
+    if(text.length > QR_SIZE_LIMIT) {
+      $("answerState").textContent="Answer created. QR is large — copy or download the text for a more reliable handoff.";
+    } else {
+      $("answerState").textContent="Send this answer back to the host.";
+    }
     setStatus("Answer created");
   }catch(e){alert(e.message);}
 };
@@ -259,6 +322,7 @@ $("copyAnswerBtn").onclick=()=>copyText($("generatedAnswer").value);
 $("downloadAnswerBtn").onclick=()=>downloadJson("walkie-answer.json",$("generatedAnswer").value);
 
 async function startScanner(target) {
+  if(state.scannerStream) stopScanner();
   state.scanTarget=target;
   try{
     if(!window.isSecureContext) throw new Error("Camera scanning requires HTTPS or localhost. Run the app via a local server or GitHub Pages.");
@@ -271,25 +335,30 @@ async function startScanner(target) {
   }catch(e){alert(e.message);}
 }
 function scanLoop(){
-  if(!state.scannerStream)return;
+  if(!state.scannerStream) return;
   const video=$("scanVideo"),canvas=$("scanCanvas"),ctx=canvas.getContext("2d",{willReadFrequently:true});
-  if(video.readyState>=2){
-    canvas.width=video.videoWidth;canvas.height=video.videoHeight;ctx.drawImage(video,0,0,canvas.width,canvas.height);
-    const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-    if(typeof jsQR!=="undefined"){
-      const code=jsQR(img.data,img.width,img.height,{inversionAttempts:"attemptBoth"});
-      if(code?.data){
-        if(state.scanTarget==="offer")$("joinOfferText").value=code.data;else $("answerText").value=code.data;
-        stopScanner();$("scanStatus").textContent="QR scanned.";
-        return;
-      }
+  if(video.readyState < 2 || !video.videoWidth || !video.videoHeight){
+    state.scanFrame=requestAnimationFrame(scanLoop);
+    return;
+  }
+  canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+  if(img?.data && img.data.length && typeof jsQR !== "undefined"){
+    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:"attemptBoth"});
+    if(code?.data){
+      if(state.scanTarget==="offer")$("joinOfferText").value=code.data;else $("answerText").value=code.data;
+      stopScanner();$("scanStatus").textContent="QR scanned.";
+      return;
     }
   }
   state.scanFrame=requestAnimationFrame(scanLoop);
 }
 function stopScanner(){
   if(state.scanFrame)cancelAnimationFrame(state.scanFrame);
+  state.scanFrame=null;
   state.scannerStream?.getTracks().forEach(t=>t.stop());state.scannerStream=null;
+  state.scanTarget=null;
   $("scanVideo").srcObject=null;hide("scanPanel");
 }
 $("scanOfferBtn").onclick=()=>startScanner("offer");
@@ -297,16 +366,17 @@ $("scanAnswerBtn").onclick=()=>startScanner("answer");
 $("stopScanBtn").onclick=stopScanner;
 
 $("disconnectBtn").onclick=()=>{
-  stopTalking();stopScanner();
-  for(const id of [...state.peers.keys()])removePeer(id);
-  state.pendingHostPc=null;state.pendingJoinPc=null;
-  state.localStream?.getTracks().forEach(t=>t.stop());state.localStream=null;
+  resetConnectionState();
   setStatus("Disconnected");updateAudioControls();
 };
 
 window.addEventListener("beforeunload",()=>{
-  stopScanner();state.localStream?.getTracks().forEach(t=>t.stop());
-  for(const p of state.peers.values())p.pc.close();
+  resetConnectionState();
+  for(const p of state.peers.values()){
+    try{p.pc.close();}catch{}
+    p.remoteStream?.getTracks().forEach(track=>{try{track.stop();}catch{}});
+  }
+  state.peers.clear();
 });
 
 // Browsers need a user gesture before remote audio playback is always allowed.
