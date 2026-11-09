@@ -245,7 +245,9 @@ $("downloadAnswerBtn").onclick=()=>downloadJson("walkie-answer.json",$("generate
 async function startScanner(target) {
   state.scanTarget=target;
   try{
-    if(!navigator.mediaDevices?.getUserMedia)throw new Error("Camera requires HTTPS and a supported browser.");
+    if(!window.isSecureContext) throw new Error("Camera scanning requires HTTPS or localhost. Run the app via a local server or GitHub Pages.");
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error("Camera requires HTTPS and a supported browser.");
+    if(typeof jsQR === "undefined") throw new Error("The QR scanner library did not load. Refresh the page or check your internet connection.");
     state.scannerStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
     $("scanVideo").srcObject=state.scannerStream;await $("scanVideo").play();
     show("scanPanel");$("scanStatus").textContent="Point the camera at the connection QR code.";
@@ -295,7 +297,8 @@ window.addEventListener("beforeunload",()=>{
 document.addEventListener("pointerdown",()=>{for(const p of state.peers.values())p.audio?.play().catch(()=>{});},{once:true});
 
 if(!window.isSecureContext) {
-  $("audioStatus").textContent="Warning: this page is not a secure context. Use its HTTPS GitHub Pages URL for microphone/camera access.";
+  $("audioStatus").textContent="Warning: this page is not a secure context. Use its HTTPS GitHub Pages URL or a localhost server for microphone/camera access.";
+  $("scanStatus").textContent="Camera scanning requires HTTPS or localhost.";
 }
 setStatus("Ready");
 })();
