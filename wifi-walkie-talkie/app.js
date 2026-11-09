@@ -34,16 +34,27 @@ function waitIceComplete(pc) {
     pc.addEventListener("icegatheringstatechange",handler);
   });
 }
-function encodeSignal(obj) { return JSON.stringify(obj); }
+function encodeSignal(obj) {
+  const compact = { t: obj.type, s: obj.sdp };
+  if(obj.from) compact.f = obj.from;
+  if(obj.version) compact.v = obj.version;
+  return JSON.stringify(compact);
+}
 function parseSignal(value, expected) {
   let data; try { data=JSON.parse(value); } catch { throw new Error("That is not valid JSON. Paste the complete connection text."); }
-  if(!data || data.type!==expected || !data.sdp) throw new Error("Expected a valid "+expected+" connection description.");
-  return data;
+  const type = data.type ?? data.t;
+  const sdp = data.sdp ?? data.s;
+  if(!data || type!==expected || !sdp) throw new Error("Expected a valid "+expected+" connection description.");
+  return { ...data, type, sdp, from: data.from ?? data.f, version: data.version ?? data.v ?? 1 };
 }
 function makeQr(containerId, text) {
   const el=$(containerId); el.innerHTML="";
   if(typeof QRCode==="undefined"){el.textContent="QR library unavailable. Use Copy instead.";return;}
-  new QRCode(el,{text,width:230,height:230,correctLevel:QRCode.CorrectLevel.L});
+  if(text.length > 1800){
+    el.textContent="This connection payload is large. Use Copy/Download JSON for best reliability on mobile.";
+    return;
+  }
+  new QRCode(el,{text,width:260,height:260,correctLevel:QRCode.CorrectLevel.H});
 }
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); alert("Copied."); }
@@ -215,9 +226,13 @@ $("downloadOfferBtn").onclick=()=>downloadJson("walkie-offer.json",$("offerText"
 $("applyAnswerBtn").onclick=async()=>{
   try{
     if(!state.pendingHostPc)throw new Error("Create an invitation first.");
+    if(state.pendingHostPc.remoteDescription) throw new Error("This connection already has a remote description. Create a fresh invitation for a new device.");
+    if(state.pendingHostPc.signalingState !== "have-local-offer") throw new Error("This invitation is not ready to receive an answer yet. Create a new offer and try again.");
     const answer=parseSignal($("answerText").value,"answer");
     await state.pendingHostPc.setRemoteDescription(answer);
     if(state.pendingHostPeer && answer.from)state.pendingHostPeer.name=answer.from;
+    state.pendingHostPc=null;state.pendingHostPeer=null;
+    $("answerText").value="";
     setStatus("Answer applied");renderPeers();
   }catch(e){alert(e.message);}
 };
@@ -229,6 +244,7 @@ $("createAnswerBtn").onclick=async()=>{
     pc.addTransceiver("audio",{direction:"sendrecv"});
     const peer=addPeer(pc,offer.from||"Host","join");
     state.pendingJoinPc=pc;state.pendingJoinPeer=peer;
+    if(pc.remoteDescription) throw new Error("This joining device is already connected. Start a new offer from the host.");
     await pc.setRemoteDescription(offer);
     const answer=await pc.createAnswer();await pc.setLocalDescription(answer);
     $("answerState").textContent="Gathering local network candidates…";
