@@ -28,11 +28,20 @@ $("saveNameBtn").onclick = () => { localStorage.setItem("wt-name", deviceName())
 const savedName = localStorage.getItem("wt-name"); if(savedName) $("deviceName").value=savedName;
 
 function waitIceComplete(pc) {
-  return new Promise((resolve,reject) => {
-    if(pc.iceGatheringState==="complete") return resolve();
-    const timer=setTimeout(()=>reject(new Error("ICE gathering timed out. Try again on the same Wi-Fi.")),ICE_TIMEOUT_MS);
-    const handler=()=>{ if(pc.iceGatheringState==="complete"){clearTimeout(timer);pc.removeEventListener("icegatheringstatechange",handler);resolve();}};
-    pc.addEventListener("icegatheringstatechange",handler);
+  return new Promise((resolve) => {
+    if (!pc || pc.iceGatheringState === "complete" || !pc.localDescription) return resolve();
+    const timer = setTimeout(() => {
+      pc.removeEventListener("icegatheringstatechange", handler);
+      resolve();
+    }, ICE_TIMEOUT_MS);
+    const handler = () => {
+      if (pc.iceGatheringState === "complete") {
+        clearTimeout(timer);
+        pc.removeEventListener("icegatheringstatechange", handler);
+        resolve();
+      }
+    };
+    pc.addEventListener("icegatheringstatechange", handler);
   });
 }
 function encodeSignal(obj) {
@@ -113,6 +122,9 @@ function addPeer(pc,name,role) {
   renderPeers(); updateAudioControls(); return peer;
 }
 function clearPendingHostConnection() {
+  if (state.pendingHostPeer) {
+    removePeer(state.pendingHostPeer.id);
+  }
   if(state.pendingHostPc){
     try{state.pendingHostPc.close();}catch{}
     state.pendingHostPc=null;
@@ -120,6 +132,9 @@ function clearPendingHostConnection() {
   state.pendingHostPeer=null;
 }
 function clearPendingJoinConnection() {
+  if (state.pendingJoinPeer) {
+    removePeer(state.pendingJoinPeer.id);
+  }
   if(state.pendingJoinPc){
     try{state.pendingJoinPc.close();}catch{}
     state.pendingJoinPc=null;
@@ -144,6 +159,7 @@ function resetConnectionState() {
   $("answerText").value="";$("joinOfferText").value="";$("generatedAnswer").value="";
   $("offerText").value="";$("answerArea").classList.add("hidden");$("offerArea").classList.add("hidden");
   $("answerState").textContent="";$("offerState").textContent="";
+  $("scanStatus").textContent="Allow camera access and point it at the QR code.";
 }
 function renderPeers() {
   const list=$("participants");list.innerHTML="";
