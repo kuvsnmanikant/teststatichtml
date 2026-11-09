@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <title>Wi-Fi Walkie-Talkie</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- QR generation/scanning helpers; app logic remains vanilla JavaScript. -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-mark">◉</div>
+      <div><h1>Wi-Fi Talk</h1><p>Private, local-network voice</p></div>
+      <span id="appStatus" class="pill muted">Not connected</span>
+    </header>
+
+    <section class="card">
+      <div class="section-heading"><div><h2>Your device</h2><p>Choose a name other people will recognize.</p></div></div>
+      <div class="inline">
+        <input id="deviceName" maxlength="24" value="My device" aria-label="Device name">
+        <button id="saveNameBtn" class="secondary">Save</button>
+      </div>
+      <p class="hint">Use all devices on the same non-guest Wi-Fi network. Router client isolation must be disabled.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-heading"><div><h2>Connection</h2><p>One host connects separately to each participant.</p></div></div>
+      <div class="actions">
+        <button id="hostBtn" class="primary">Create room (host)</button>
+        <button id="joinBtn" class="secondary">Join a room</button>
+      </div>
+      <div id="hostPanel" class="subpanel hidden">
+        <h3>Host connection setup</h3>
+        <p class="hint">Create one invitation for each joining device. Wait until ICE gathering finishes, then share the offer QR or text.</p>
+        <button id="makeOfferBtn" class="primary">Create invitation for a device</button>
+        <div id="offerArea" class="hidden">
+          <label for="offerText">Offer (share this with the joining device)</label>
+          <textarea id="offerText" readonly rows="5"></textarea>
+          <div class="actions">
+            <button id="copyOfferBtn" class="secondary">Copy offer</button>
+            <button id="downloadOfferBtn" class="secondary">Download JSON</button>
+          </div>
+          <div id="offerQr" class="qr"></div>
+          <p id="offerState" class="hint"></p>
+          <label for="answerText">Paste the answer returned by that device</label>
+          <textarea id="answerText" rows="5" placeholder="Paste answer JSON here"></textarea>
+          <div class="actions">
+            <button id="applyAnswerBtn" class="primary">Connect participant</button>
+            <button id="scanAnswerBtn" class="secondary">Scan answer QR</button>
+          </div>
+        </div>
+      </div>
+      <div id="joinPanel" class="subpanel hidden">
+        <h3>Join an existing room</h3>
+        <p class="hint">Paste or scan the host's offer. This device will create an answer to send back.</p>
+        <label for="joinOfferText">Host offer</label>
+        <textarea id="joinOfferText" rows="5" placeholder="Paste offer JSON here"></textarea>
+        <div class="actions">
+          <button id="createAnswerBtn" class="primary">Create answer</button>
+          <button id="scanOfferBtn" class="secondary">Scan offer QR</button>
+        </div>
+        <div id="answerArea" class="hidden">
+          <label for="generatedAnswer">Your answer (send this to the host)</label>
+          <textarea id="generatedAnswer" readonly rows="5"></textarea>
+          <div class="actions">
+            <button id="copyAnswerBtn" class="secondary">Copy answer</button>
+            <button id="downloadAnswerBtn" class="secondary">Download JSON</button>
+          </div>
+          <div id="answerQr" class="qr"></div>
+          <p id="answerState" class="hint"></p>
+        </div>
+      </div>
+      <div id="scanPanel" class="subpanel hidden">
+        <h3>Scan connection QR</h3>
+        <video id="scanVideo" playsinline muted></video>
+        <canvas id="scanCanvas" class="hidden"></canvas>
+        <p id="scanStatus" class="hint">Allow camera access and point it at the QR code.</p>
+        <button id="stopScanBtn" class="secondary">Stop camera</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading"><div><h2>Audio</h2><p>Choose how you want to communicate.</p></div></div>
+      <div class="mode-grid">
+        <button id="pttModeBtn" class="mode selected"><strong>Push to talk</strong><small>Hold to transmit</small></button>
+        <button id="duplexModeBtn" class="mode"><strong>Two-way audio</strong><small>Open microphone</small></button>
+        <button id="toggleModeBtn" class="mode"><strong>Toggle to talk</strong><small>Click to start/stop</small></button>
+      </div>
+      <div class="audio-controls">
+        <button id="talkBtn" class="talk" disabled>
+          <span class="mic">🎙</span><strong>HOLD TO TALK</strong><small>Release to stop</small>
+        </button>
+        <div class="audio-side">
+          <button id="muteBtn" class="secondary" disabled>Mute speaker</button>
+          <label class="check"><input id="micEnabled" type="checkbox" checked> Microphone enabled</label>
+          <label class="check"><input id="speakerEnabled" type="checkbox" checked> Speaker enabled</label>
+        </div>
+      </div>
+      <p id="audioStatus" class="hint">Connect at least one peer to start.</p>
+    </section>
+
+    <section class="card">
+      <div class="section-heading"><div><h2>Participants</h2><p id="participantCount">0 connected</p></div></div>
+      <ul id="participants" class="participants"><li class="empty">No participants connected yet.</li></ul>
+    </section>
+
+    <section class="card danger-zone">
+      <button id="disconnectBtn" class="danger" disabled>Disconnect all</button>
+      <p class="hint">Connection details are stored only in this page's memory. Refreshing the page ends connections.</p>
+    </section>
+    <footer>Static WebRTC demo · No account · No cloud audio server</footer>
+  </main>
+</body>
+</html>
