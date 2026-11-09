@@ -51,11 +51,37 @@ function encodeSignal(obj) {
   return JSON.stringify(compact);
 }
 function parseSignal(value, expected) {
-  let data; try { data=JSON.parse(value); } catch { throw new Error("That is not valid JSON. Paste the complete connection text."); }
+  const normalize = (input) => {
+    if (input == null) return null;
+    let text = String(input).trim();
+    if (!text) return null;
+
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === "object") return parsed;
+      if (typeof parsed === "string") return normalize(parsed);
+    } catch {}
+
+    if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+      try { return normalize(JSON.parse(text)); } catch {}
+    }
+
+    return null;
+  };
+
+  const data = normalize(value);
+  if (!data) throw new Error("That is not valid JSON. Paste the complete connection text from the other device.");
+
   const type = data.type ?? data.t;
   const sdp = data.sdp ?? data.s;
-  if(!data || type!==expected || !sdp) throw new Error("Expected a valid "+expected+" connection description.");
-  return { ...data, type, sdp, from: data.from ?? data.f, version: data.version ?? data.v ?? 1 };
+  if (!sdp) throw new Error("That value does not look like a valid WebRTC offer/answer.");
+  if (type && expected && type !== expected) {
+    const expectedLabel = expected === "offer" ? "offer" : "answer";
+    const actualLabel = type === "offer" ? "offer" : "answer";
+    throw new Error("This looks like the " + actualLabel + " value, not the " + expectedLabel + " value. Paste the correct text.");
+  }
+
+  return { ...data, type: type || expected, sdp, from: data.from ?? data.f, version: data.version ?? data.v ?? 1 };
 }
 function makeQr(containerId, text) {
   const el=$(containerId); el.innerHTML="";
